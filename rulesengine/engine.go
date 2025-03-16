@@ -227,32 +227,17 @@ func compare(a, b interface{}) int {
 
 func toFloat64(value interface{}) (float64, bool) {
 	switch v := value.(type) {
-	case int:
-		return float64(v), true
-	case int8:
-		return float64(v), true
-	case int16:
-		return float64(v), true
-	case int32:
-		return float64(v), true
-	case int64:
-		return float64(v), true
-	case uint:
-		return float64(v), true
-	case uint8:
-		return float64(v), true
-	case uint16:
-		return float64(v), true
-	case uint32:
-		return float64(v), true
-	case uint64:
-		return float64(v), true
+	case int, int8, int16, int32, int64:
+		return float64(reflect.ValueOf(v).Int()), true
+	case uint, uint8, uint16, uint32, uint64:
+		return float64(reflect.ValueOf(v).Uint()), true
 	case float32:
 		return float64(v), true
 	case float64:
 		return v, true
+	default:
+		return 0, false
 	}
-	return 0, false
 }
 
 // PathResolverFunc defines how to extract a value given a path.
@@ -275,4 +260,13 @@ type RunResult struct {
 	Almanac            *Almanac
 	RuleResults        []*RuleResult
 	FailureRuleResults []*RuleResult
+}
+
+// Get all rules
+func (e *Engine) GetRulesAsJSON() []interface{} {
+	var rules []interface{}
+	for _, rule := range e.rules {
+		rules = append(rules, rule.ToJSON())
+	}
+	return rules
 }

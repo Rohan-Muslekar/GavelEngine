@@ -98,3 +98,8 @@ func (a *Almanac) GetEvents() []Event {
 func (a *Almanac) GetRuleResults() []*RuleResult {
 	return a.ruleResults
 }
+
+// Get runtime facts
+func (a *Almanac) GetRuntimeFacts() map[string]interface{} {
+	return a.runtimeFacts
+}

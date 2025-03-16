@@ -186,3 +186,13 @@ func resolveOperator(operator string, engine *Engine) (OperatorFunc, error) {
 func splitOperator(op string) []string {
 	return strings.Split(op, ":")
 }
+
+func (rule *Rule) ToJSON() map[string]interface{} {
+	json := map[string]interface{}{
+		"conditions": rule.Conditions,
+		"event":      rule.Event,
+		"priority":   rule.Priority,
+		"name":       rule.Name,
+	}
+	return json
+}

@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GavelEngine - Business Rules Management</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Toast messages -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <!-- CodeMirror for JSON editing -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.9/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.9/theme/dracula.min.css">
+    <!-- Custom styles -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-gavel"></i>
+            <span>GavelEngine</span>
+        </div>
+        <ul class="sidebar-menu">
+            <li>
+                <a href="#" class="sidebar-link active" data-page="dashboard">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+            </li>
+            <li>
+                <a href="#" class="sidebar-link" data-page="engines">
+                    <i class="fas fa-cogs"></i>
+                    <span>Engines</span>
+                </a>
+            </li>
+            <li>
+                <a href="#" class="sidebar-link" data-page="facts">
+                    <i class="fas fa-database"></i>
+                    <span>Facts</span>
+                </a>
+            </li>
+            <li>
+                <a href="#" class="sidebar-link" data-page="rules">
+                    <i class="fas fa-list-check"></i>
+                    <span>Rules</span>
+                </a>
+            </li>
+            <li>
+                <a href="#" class="sidebar-link" data-page="run">
+                    <i class="fas fa-play-circle"></i>
+                    <span>Run Engine</span>
+                </a>
+            </li>
+        </ul>
+        <div class="sidebar-footer">
+            <div id="current-engine">No engine selected</div>
+        </div>
+    </div>
+
+    <!-- Main content -->
+    <div class="main-content">
+        <header class="main-header">
+            <div class="header-left">
+                <button id="sidebar-toggle" class="sidebar-toggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1 id="page-title">Dashboard</h1>
+            </div>
+            <div class="header-right">
+                <select id="engine-selector" class="form-select">
+                    <option value="">Select Engine</option>
+                </select>
+            </div>
+        </header>
+
+        <div class="content-wrapper">
+            <!-- Dashboard Page -->
+            <div id="dashboard-page" class="content-page active">
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                <h2 class="card-title">Welcome to GavelEngine Business Rules Management</h2>
+                                <p class="card-text">
+                                    This interface allows you to create and manage business rules engines.
+                                    Use the sidebar to navigate through the different sections.
+                                </p>
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i>
+                                    Get started by creating or selecting an engine in the <a href="#" class="alert-link" data-page="engines">Engines</a> section.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="stat-card">
+                            <div class="stat-card-header">
+                                <i class="fas fa-cogs"></i>
+                                <span>Engines</span>
+                            </div>
+                            <div class="stat-card-body">
+                                <div class="stat-card-value" id="stat-engines">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-card">
+                            <div class="stat-card-header">
+                                <i class="fas fa-database"></i>
+                                <span>Facts</span>
+                            </div>
+                            <div class="stat-card-body">
+                                <div class="stat-card-value" id="stat-facts">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-card">
+                            <div class="stat-card-header">
+                                <i class="fas fa-list-check"></i>
+                                <span>Rules</span>
+                            </div>
+                            <div class="stat-card-body">
+                                <div class="stat-card-value" id="stat-rules">0</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Quick Actions</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="quick-actions">
+                                    <a href="#" class="quick-action-btn" data-page="engines">
+                                        <i class="fas fa-plus-circle"></i>
+                                        <span>Create Engine</span>
+                                    </a>
+                                    <a href="#" class="quick-action-btn" data-page="facts">
+                                        <i class="fas fa-plus-circle"></i>
+                                        <span>Add Fact</span>
+                                    </a>
+                                    <a href="#" class="quick-action-btn" data-page="rules">
+                                        <i class="fas fa-plus-circle"></i>
+                                        <span>Create Rule</span>
+                                    </a>
+                                    <a href="#" class="quick-action-btn" data-page="run">
+                                        <i class="fas fa-play-circle"></i>
+                                        <span>Run Engine</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Engines Page -->
+            <div id="engines-page" class="content-page">
+                <div class="row mb-4">
+                    <div class="col-lg-5">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Create New Engine</h3>
+                            </div>
+                            <div class="card-body">
+                                <form id="create-engine-form">
+                                    <div class="mb-3">
+                                        <label for="engine-name" class="form-label">Engine Name</label>
+                                        <input type="text" class="form-control" id="engine-name" placeholder="Enter engine name" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-plus-circle"></i> Create Engine
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-7">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Engines</h3>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover engine-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Facts</th>
+                                                <th>Rules</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="engines-list">
+                                            <tr>
+                                                <td colspan="4" class="text-center">No engines found.</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Facts Page -->
+            <div id="facts-page" class="content-page">
+                <div class="engine-required-alert alert alert-warning mb-4">
+                    Please select an engine first to manage facts.
+                </div>
+                <div class="engine-content d-none">
+                    <div class="row mb-4">
+                        <div class="col-lg-5">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Add New Fact</h3>
+                                </div>
+                                <div class="card-body">
+                                    <form id="add-fact-form">
+                                        <div class="mb-3">
+                                            <label for="fact-id" class="form-label">Fact ID</label>
+                                            <input type="text" class="form-control" id="fact-id" placeholder="Enter fact ID" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="fact-type" class="form-label">Fact Type</label>
+                                            <select class="form-select" id="fact-type" required>
+                                                <option value="constant">Constant</option>
+                                                <option value="function">Function</option>
+                                            </select>
+                                        </div>
+                                        <div id="constant-value-group" class="mb-3">
+                                            <label for="constant-value" class="form-label">Constant Value</label>
+                                            <input type="text" class="form-control" id="constant-value" placeholder="Enter value">
+                                            <small class="form-text text-muted">
+                                                Values will be automatically converted to appropriate types (number, boolean, etc.)
+                                            </small>
+                                        </div>
+                                        <div id="function-value-group" class="mb-3 d-none">
+                                            <label for="function-description" class="form-label">Function Description</label>
+                                            <textarea class="form-control" id="function-description" rows="3" placeholder="Describe what this function does"></textarea>
+                                            <small class="form-text text-muted">
+                                                Function facts retrieve values from runtime facts when the engine runs.
+                                            </small>
+                                        </div>
+                                        <div class="mb-3 form-check">
+                                            <input type="checkbox" class="form-check-input" id="fact-cache" checked>
+                                            <label class="form-check-label" for="fact-cache">Cache Result</label>
+                                            <small class="d-block form-text text-muted">
+                                                Cache the result of this fact for performance.
+                                            </small>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-plus-circle"></i> Add Fact
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                            <div class="card mt-4">
+                                <div class="card-header">
+                                    <h3>Predefined Facts</h3>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>ID</th>
+                                                    <th>Description</th>
+                                                    <th>Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="predefined-facts-list">
+                                                <tr>
+                                                    <td colspan="3" class="text-center">Loading predefined facts...</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-7">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Facts</h3>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>ID</th>
+                                                    <th>Type</th>
+                                                    <th>Cache</th>
+                                                    <th>Details</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="facts-list">
+                                                <tr>
+                                                    <td colspan="5" class="text-center">No facts found.</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rules Page -->
+            <div id="rules-page" class="content-page">
+                <div class="engine-required-alert alert alert-warning mb-4">
+                    Please select an engine first to manage rules.
+                </div>
+                <div class="engine-content d-none">
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Create Rule</h3>
+                                </div>
+                                <div class="card-body">
+                                    <form id="create-rule-form">
+                                        <div class="row">
+                                            <div class="col-lg-6">
+                                                <div class="mb-3">
+                                                    <label for="rule-name" class="form-label">Rule Name</label>
+                                                    <input type="text" class="form-control" id="rule-name" placeholder="Enter rule name" required>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label for="rule-priority" class="form-label">Priority</label>
+                                                    <input type="number" class="form-control" id="rule-priority" value="1" min="1">
+                                                    <small class="form-text text-muted">Higher priority rules are evaluated first.</small>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Event</label>
+                                                    <div class="card bg-light">
+                                                        <div class="card-body">
+                                                            <div class="mb-3">
+                                                                <label for="event-type" class="form-label">Event Type</label>
+                                                                <input type="text" class="form-control" id="event-type" placeholder="Enter event type" required>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label for="event-params" class="form-label">Event Parameters (JSON)</label>
+                                                                <div id="event-params-editor" class="code-editor"></div>
+                                                                <small class="form-text text-muted">
+                                                                    Enter parameters as JSON object.
+                                                                </small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Conditions</label>
+                                                    <div class="card bg-light">
+                                                        <div class="card-body">
+                                                            <ul class="nav nav-tabs mb-3" role="tablist">
+                                                                <li class="nav-item" role="presentation">
+                                                                    <button class="nav-link active" id="visual-tab" data-bs-toggle="tab" data-bs-target="#visual-builder" type="button" role="tab">Visual Builder</button>
+                                                                </li>
+                                                                <li class="nav-item" role="presentation">
+                                                                    <button class="nav-link" id="json-tab" data-bs-toggle="tab" data-bs-target="#json-editor" type="button" role="tab">JSON Editor</button>
+                                                                </li>
+                                                            </ul>
+                                                            <div class="tab-content">
+                                                                <div class="tab-pane fade show active" id="visual-builder" role="tabpanel">
+                                                                    <div id="condition-builder">
+                                                                        <div class="condition-group">
+                                                                            <div class="condition-group-header">
+                                                                                <select class="form-select condition-group-type">
+                                                                                    <option value="all">ALL of these conditions (AND)</option>
+                                                                                    <option value="any">ANY of these conditions (OR)</option>
+                                                                                </select>
+                                                                                <button type="button" class="btn btn-sm btn-primary add-condition">
+                                                                                    <i class="fas fa-plus"></i> Add Condition
+                                                                                </button>
+                                                                            </div>
+                                                                            <div class="condition-items">
+                                                                                <!-- Conditions will be added here -->
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="tab-pane fade" id="json-editor" role="tabpanel">
+                                                                    <div id="conditions-json-editor" class="code-editor"></div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="text-end">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fas fa-plus-circle"></i> Create Rule
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Rules</h3>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>Name</th>
+                                                    <th>Priority</th>
+                                                    <th>Event Type</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="rules-list">
+                                                <tr>
+                                                    <td colspan="4" class="text-center">No rules found.</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Run Engine Page -->
+            <div id="run-page" class="content-page">
+                <div class="engine-required-alert alert alert-warning mb-4">
+                    Please select an engine first to run it.
+                </div>
+                <div class="engine-content d-none">
+                    <div class="row mb-4">
+                        <div class="col-lg-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Runtime Facts</h3>
+                                </div>
+                                <div class="card-body">
+                                    <form id="run-engine-form">
+                                        <div class="mb-3">
+                                            <label for="runtime-facts" class="form-label">Runtime Facts (JSON)</label>
+                                            <div id="runtime-facts-editor" class="code-editor"></div>
+                                            <small class="form-text text-muted">
+                                                Enter runtime facts as JSON object. These values will be used to evaluate the rules.
+                                            </small>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-play-circle"></i> Run Engine
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Results</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div id="run-results-wrapper">
+                                        <div id="run-results-placeholder" class="text-center text-muted py-5">
+                                            <i class="fas fa-play-circle fa-3x mb-3"></i>
+                                            <p>Run the engine to see results here.</p>
+                                        </div>
+                                        <div id="run-results" class="d-none">
+                                            <ul class="nav nav-tabs mb-3" role="tablist">
+                                                <li class="nav-item" role="presentation">
+                                                    <button class="nav-link active" id="events-tab" data-bs-toggle="tab" data-bs-target="#events-tab-content" type="button" role="tab">Events</button>
+                                                </li>
+                                                <li class="nav-item" role="presentation">
+                                                    <button class="nav-link" id="rule-results-tab" data-bs-toggle="tab" data-bs-target="#rule-results-tab-content" type="button" role="tab">Rule Results</button>
+                                                </li>
+                                                <li class="nav-item" role="presentation">
+                                                    <button class="nav-link" id="raw-tab" data-bs-toggle="tab" data-bs-target="#raw-tab-content" type="button" role="tab">Raw JSON</button>
+                                                </li>
+                                            </ul>
+                                            <div class="tab-content">
+                                                <div class="tab-pane fade show active" id="events-tab-content" role="tabpanel">
+                                                    <div id="events-list" class="results-list"></div>
+                                                </div>
+                                                <div class="tab-pane fade" id="rule-results-tab-content" role="tabpanel">
+                                                    <div id="rule-results-list" class="results-list"></div>
+                                                </div>
+                                                <div class="tab-pane fade" id="raw-tab-content" role="tabpanel">
+                                                    <pre id="raw-results" class="p-3 bg-light rounded"></pre>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal fade" id="rule-details-modal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Rule Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <h6>Conditions</h6>
+                        <pre id="rule-conditions-preview" class="p-3 bg-light rounded"></pre>
+                    </div>
+                    <div>
+                        <h6>Event</h6>
+                        <pre id="rule-event-preview" class="p-3 bg-light rounded"></pre>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Templates -->
+    <template id="condition-item-template">
+        <div class="condition-item">
+            <div class="row g-2 align-items-center">
+                <div class="col-3">
+                    <select class="form-select fact-select">
+                        <option value="" disabled selected>Select Fact</option>
+                    </select>
+                </div>
+                <div class="col-3">
+                    <select class="form-select operator-select">
+                        <option value="" disabled selected>Select Operator</option>
+                        <option value="equal">Equal (==)</option>
+                        <option value="notEqual">Not Equal (!=)</option>
+                        <option value="greaterThan">Greater Than (>)</option>
+                        <option value="greaterThanInclusive">Greater Than or Equal (>=)</option>
+                        <option value="lessThan">Less Than (<)</option>
+                        <option value="lessThanInclusive">Less Than or Equal (<=)</option>
+                    </select>
+                </div>
+                <div class="col-3">
+                    <input type="text" class="form-control value-input" placeholder="Value">
+                </div>
+                <div class="col-3">
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-condition">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary add-nested-condition ms-1">
+                        <i class="fas fa-sitemap"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Toastify for notifications -->
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <!-- CodeMirror for JSON editing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.9/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.9/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.9/addon/edit/matchbrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.9/addon/lint/lint.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.9/addon/lint/json-lint.min.js"></script>
+    <!-- Main JS -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
