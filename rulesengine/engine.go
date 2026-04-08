@@ -194,7 +194,23 @@ func (e *Engine) initOperators() {
 	e.operators["greaterThanInclusive"] = func(factValue, conditionValue interface{}) bool {
 		return compare(factValue, conditionValue) >= 0
 	}
-	// Additional operators (e.g. for arrays) can be added here.
+	// Short aliases for common operators.
+	e.operators["lt"] = e.operators["lessThan"]
+	e.operators["gt"] = e.operators["greaterThan"]
+	e.operators["eq"] = e.operators["equal"]
+	e.operators["ne"] = e.operators["notEqual"]
+	e.operators["lte"] = e.operators["lessThanInclusive"]
+	e.operators["gte"] = e.operators["greaterThanInclusive"]
+}
+
+// EvaluateCondition evaluates a condition tree against the provided facts
+// using a default Engine with standard operators. This is a convenience
+// wrapper for consumers who only need condition evaluation without the
+// full Rule/Event pipeline.
+func EvaluateCondition(condition Condition, facts map[string]interface{}) (bool, error) {
+	engine := NewEngine()
+	almanac := NewAlmanac(engine, facts)
+	return condition.Evaluate(almanac, engine)
 }
 
 // compare compares two values as numbers (or as strings if not numbers).

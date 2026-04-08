@@ -88,15 +88,15 @@ type Event struct {
 
 // Condition represents a rule condition. It supports basic comparisons as well as nested boolean expressions.
 type Condition struct {
-	All          []Condition            `json:"all,omitempty"`
-	Any          []Condition            `json:"any,omitempty"`
-	Not          *Condition             `json:"not,omitempty"`
-	Fact         string                 `json:"fact,omitempty"`
-	Operator     string                 `json:"operator,omitempty"`
-	Value        interface{}            `json:"value,omitempty"`
-	Params       map[string]interface{} `json:"params,omitempty"`
-	Path         string                 `json:"path,omitempty"`
-	ConditionRef string                 `json:"condition,omitempty"` // For referencing a named condition.
+	All          []Condition            `json:"all,omitempty" bson:"all,omitempty"`
+	Any          []Condition            `json:"any,omitempty" bson:"any,omitempty"`
+	Not          *Condition             `json:"not,omitempty" bson:"not,omitempty"`
+	Fact         string                 `json:"fact,omitempty" bson:"fact,omitempty"`
+	Operator     string                 `json:"operator,omitempty" bson:"operator,omitempty"`
+	Value        interface{}            `json:"value,omitempty" bson:"value,omitempty"`
+	Params       map[string]interface{} `json:"params,omitempty" bson:"params,omitempty"`
+	Path         string                 `json:"path,omitempty" bson:"path,omitempty"`
+	ConditionRef string                 `json:"condition,omitempty" bson:"condition,omitempty"`
 }
 
 // Evaluate evaluates the condition recursively.
