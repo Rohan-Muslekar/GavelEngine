@@ -1,224 +1,188 @@
-// engine_test.go
 package rulesengine
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
-	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestEngineSimpleRule(t *testing.T) {
+func TestEngine_SingleRule(t *testing.T) {
 	engine := NewEngine()
-	// Add fact "age" which retrieves a runtime fact "userAge"
-	err := engine.AddFact("age", func(params map[string]interface{}, almanac *Almanac) (interface{}, error) {
-		if userAge, ok := almanac.runtimeFacts["userAge"]; ok {
-			return userAge, nil
-		}
-		return 0, nil
-	})
+	engine.AddFact("age", 22)
 
-	if err != nil {
-		t.Fatalf("Failed to add fact: %v", err)
-	}
-	// Define rule: age >= 18 and age <= 25
-	cond := Condition{
-		All: []Condition{
-			{
-				Fact:     "age",
-				Operator: "greaterThanInclusive",
-				Value:    18,
-			},
-			{
-				Fact:     "age",
-				Operator: "lessThanInclusive",
-				Value:    25,
-			},
-		},
-	}
-	event := Event{
-		Type: "young-adult",
-		Params: map[string]interface{}{
-			"message": "User is a young adult",
-		},
-	}
-	rule := NewRule(cond, event, WithName("age-rule"))
-	engine.AddRule(rule)
-
-	// Run engine with userAge = 22.
-	runtimeFacts := map[string]interface{}{
-		"userAge": 22,
-	}
-	result, err := engine.Run(runtimeFacts)
-	if err != nil {
-		t.Fatalf("Engine run failed: %v", err)
-	}
-	if len(result.Events) != 1 {
-		t.Fatalf("Expected 1 event, got %d", len(result.Events))
-	}
-	if result.Events[0].Type != "young-adult" {
-		t.Fatalf("Expected event type 'young-adult', got %s", result.Events[0].Type)
-	}
-}
-
-func TestNestedConditions(t *testing.T) {
-	engine := NewEngine()
-	// Fact "score" returns the runtime fact "score"
-	err := engine.AddFact("score", func(params map[string]interface{}, almanac *Almanac) (interface{}, error) {
-		if val, ok := almanac.runtimeFacts["score"]; ok {
-			return val, nil
-		}
-		return 0, nil
-	})
-
-	if err != nil {
-		t.Fatalf("Failed to add fact: %v", err)
-	}
-
-	// Condition: score > 50 AND (score < 70 OR score > 90)
-	cond := Condition{
-		All: []Condition{
-			{
-				Fact:     "score",
-				Operator: "greaterThan",
-				Value:    50,
-			},
-			{
-				Any: []Condition{
-					{
-						Fact:     "score",
-						Operator: "lessThan",
-						Value:    70,
-					},
-					{
-						Fact:     "score",
-						Operator: "greaterThan",
-						Value:    90,
-					},
-				},
-			},
-		},
-	}
-	event := Event{
-		Type: "special-score",
-		Params: map[string]interface{}{
-			"info": "Score meets criteria",
-		},
-	}
-	rule := NewRule(cond, event, WithName("score-rule"))
-	engine.AddRule(rule)
-
-	// Test with score = 65 (should pass).
-	runtimeFacts := map[string]interface{}{
-		"score": 65,
-	}
-	result, err := engine.Run(runtimeFacts)
-	if err != nil {
-		t.Fatalf("Engine run failed: %v", err)
-	}
-	if len(result.Events) != 1 {
-		t.Fatalf("Expected 1 event for score 65, got %d", len(result.Events))
-	}
-
-	// Test with score = 80 (should fail).
-	runtimeFacts = map[string]interface{}{
-		"score": 80,
-	}
-	result, err = engine.Run(runtimeFacts)
-	if err != nil {
-		t.Fatalf("Engine run failed: %v", err)
-	}
-	if len(result.Events) != 0 {
-		t.Fatalf("Expected 0 events for score 80, got %d", len(result.Events))
-	}
-}
-
-func TestRuleChaining(t *testing.T) {
-	engine := NewEngine()
-	// Rule 1: if flag is true, add runtime fact "rule1Passed" = true.
-	cond1 := Condition{
-		Fact:     "flag",
-		Operator: "equal",
-		Value:    true,
-	}
-	event1 := Event{
-		Type:   "rule1-event",
-		Params: map[string]interface{}{},
-	}
-	rule1 := NewRule(cond1, event1, WithName("rule1"), WithPriorityForRule(10),
-		WithOnSuccess(func(event Event, almanac *Almanac, rr *RuleResult) error {
-			almanac.AddRuntimeFact("rule1Passed", true)
-			return nil
-		}))
-	engine.AddRule(rule1)
-
-	// Rule 2: if rule1Passed is true, then fire rule2 event.
-	cond2 := Condition{
-		Fact:     "rule1Passed",
-		Operator: "equal",
-		Value:    true,
-	}
-	event2 := Event{
-		Type:   "rule2-event",
-		Params: map[string]interface{}{},
-	}
-	rule2 := NewRule(cond2, event2, WithName("rule2"), WithPriorityForRule(1))
-	engine.AddRule(rule2)
-
-	runtimeFacts := map[string]interface{}{
-		"flag": true,
-	}
-	result, err := engine.Run(runtimeFacts)
-	if err != nil {
-		t.Fatalf("Engine run failed: %v", err)
-	}
-	// Expect both rule1 and rule2 events.
-	if len(result.Events) != 2 {
-		t.Fatalf("Expected 2 events from rule chaining, got %d", len(result.Events))
-	}
-}
-
-func TestAsyncFact(t *testing.T) {
-	engine := NewEngine()
-	// Simulate an asynchronous fact by sleeping.
-	err := engine.AddFact("delayed", FactFunc(func(params map[string]interface{}, almanac *Almanac) (interface{}, error) {
-		time.Sleep(100 * time.Millisecond)
-		return "done", nil
-	}))
-	if err != nil {
-		t.Fatalf("Failed to add fact: %v", err)
-	}
-	cond := Condition{
-		Fact:     "delayed",
-		Operator: "equal",
-		Value:    "done",
-	}
-	event := Event{
-		Type:   "delayed-event",
-		Params: map[string]interface{}{},
-	}
-	rule := NewRule(cond, event, WithName("delayed-rule"))
+	rule := NewRule(
+		Condition{Fact: "age", Operator: "greaterThanInclusive", Value: 18},
+		Event{Type: "adult", Params: map[string]interface{}{"msg": "is adult"}},
+		WithName("age-check"),
+	)
 	engine.AddRule(rule)
 
 	result, err := engine.Run(nil)
-	if err != nil {
-		t.Fatalf("Engine run failed: %v", err)
-	}
-	time.Sleep(200 * time.Millisecond)
-	if len(result.Events) != 1 {
-		t.Fatalf("Expected delayed event to trigger, got %d", len(result.Events))
-	}
+	require.NoError(t, err)
+	require.Len(t, result.Events, 1)
+	assert.Equal(t, "adult", result.Events[0].Type)
+	require.Len(t, result.RuleResults, 1)
+	assert.True(t, result.RuleResults[0].Success)
 }
 
-func TestContainsOperator(t *testing.T) {
+func TestEngine_MultipleRules_PriorityOrder(t *testing.T) {
+	engine := NewEngine()
+	engine.AddFact("x", 1)
+
+	var order []string
+	for _, p := range []int{1, 10, 5} {
+		name := fmt.Sprintf("rule-p%d", p)
+		n := name
+		rule := NewRule(
+			Condition{Fact: "x", Operator: "equal", Value: 1},
+			Event{Type: n},
+			WithName(n),
+			WithPriorityForRule(p),
+			WithOnSuccess(func(event Event, almanac *Almanac, rr *RuleResult) error {
+				order = append(order, n)
+				return nil
+			}),
+		)
+		engine.AddRule(rule)
+	}
+
+	_, err := engine.Run(nil)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"rule-p10", "rule-p5", "rule-p1"}, order)
+}
+
+func TestEngine_RuleFailure(t *testing.T) {
+	engine := NewEngine()
+	engine.AddFact("x", 1)
+
+	failureCalled := false
+	rule := NewRule(
+		Condition{Fact: "x", Operator: "equal", Value: 999},
+		Event{Type: "never"},
+		WithName("fail-rule"),
+		WithOnFailure(func(event Event, almanac *Almanac, rr *RuleResult) error {
+			failureCalled = true
+			return nil
+		}),
+	)
+	engine.AddRule(rule)
+
+	result, err := engine.Run(nil)
+	require.NoError(t, err)
+	assert.Empty(t, result.Events)
+	require.Len(t, result.RuleResults, 1)
+	assert.False(t, result.RuleResults[0].Success)
+	assert.True(t, failureCalled)
+}
+
+func TestEngine_RuleChaining(t *testing.T) {
 	engine := NewEngine()
 
-	// Register a custom "contains" operator.
-	// This operator expects factValue to be a slice or array and
-	// returns true if any element equals the condition value.
+	rule1 := NewRule(
+		Condition{Fact: "flag", Operator: "equal", Value: true},
+		Event{Type: "rule1-event"},
+		WithName("rule1"),
+		WithPriorityForRule(10),
+		WithOnSuccess(func(event Event, almanac *Almanac, rr *RuleResult) error {
+			almanac.AddRuntimeFact("rule1Passed", true)
+			return nil
+		}),
+	)
+	engine.AddRule(rule1)
+
+	rule2 := NewRule(
+		Condition{Fact: "rule1Passed", Operator: "equal", Value: true},
+		Event{Type: "rule2-event"},
+		WithName("rule2"),
+		WithPriorityForRule(1),
+	)
+	engine.AddRule(rule2)
+
+	result, err := engine.Run(map[string]interface{}{"flag": true})
+	require.NoError(t, err)
+	assert.Len(t, result.Events, 2)
+	assert.Equal(t, "rule1-event", result.Events[0].Type)
+	assert.Equal(t, "rule2-event", result.Events[1].Type)
+}
+
+func TestEngine_EventEmission(t *testing.T) {
+	engine := NewEngine()
+	engine.AddFact("x", 1)
+
+	rule := NewRule(
+		Condition{Fact: "x", Operator: "equal", Value: 1},
+		Event{Type: "match", Params: map[string]interface{}{"detail": "found"}},
+		WithName("emit-rule"),
+	)
+	engine.AddRule(rule)
+
+	result, err := engine.Run(nil)
+	require.NoError(t, err)
+	require.Len(t, result.Events, 1)
+	assert.Equal(t, "match", result.Events[0].Type)
+	assert.Equal(t, "found", result.Events[0].Params["detail"])
+}
+
+func TestEngine_MultipleFactsInCondition(t *testing.T) {
+	engine := NewEngine()
+	engine.AddFact("a", 10)
+	engine.AddFact("b", 20)
+	engine.AddFact("c", 30)
+
+	rule := NewRule(
+		Condition{All: []Condition{
+			{Fact: "a", Operator: "equal", Value: 10},
+			{Fact: "b", Operator: "equal", Value: 20},
+			{Fact: "c", Operator: "equal", Value: 30},
+		}},
+		Event{Type: "all-match"},
+		WithName("multi-fact"),
+	)
+	engine.AddRule(rule)
+
+	result, err := engine.Run(nil)
+	require.NoError(t, err)
+	assert.Len(t, result.Events, 1)
+}
+
+func TestEngine_Stop(t *testing.T) {
+	engine := NewEngine()
+	engine.AddFact("x", 1)
+
+	rule1 := NewRule(
+		Condition{Fact: "x", Operator: "equal", Value: 1},
+		Event{Type: "first"},
+		WithName("rule1"),
+		WithPriorityForRule(10),
+		WithOnSuccess(func(event Event, almanac *Almanac, rr *RuleResult) error {
+			engine.Stop()
+			return nil
+		}),
+	)
+	rule2 := NewRule(
+		Condition{Fact: "x", Operator: "equal", Value: 1},
+		Event{Type: "second"},
+		WithName("rule2"),
+		WithPriorityForRule(1),
+	)
+	engine.AddRule(rule1)
+	engine.AddRule(rule2)
+
+	result, err := engine.Run(nil)
+	require.NoError(t, err)
+	assert.Len(t, result.Events, 1)
+	assert.Equal(t, "first", result.Events[0].Type)
+}
+
+func TestEngine_CustomOperator(t *testing.T) {
+	engine := NewEngine()
 	engine.AddOperator("contains", func(factValue interface{}, conditionValue interface{}) bool {
 		rv := reflect.ValueOf(factValue)
-		// Ensure that factValue is a slice or array.
 		if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
 			return false
 		}
@@ -230,94 +194,129 @@ func TestContainsOperator(t *testing.T) {
 		return false
 	})
 
-	// Add a fact "colors" that returns an array of colors.
-	err := engine.AddFact("colors", FactFunc(func(params map[string]interface{}, almanac *Almanac) (interface{}, error) {
-		// Return as a slice of interface{} for generic handling.
-		return []interface{}{"red", "green", "blue"}, nil
-	}))
-	if err != nil {
-		t.Fatalf("Failed to add fact 'colors': %v", err)
-	}
-
-	// Define a rule condition that checks if the fact "colors" contains "blue".
-	cond := Condition{
-		Fact:     "colors",
-		Operator: "contains",
-		Value:    "blue",
-	}
-	event := Event{
-		Type: "contains-event",
-		Params: map[string]interface{}{
-			"msg": "The array contains blue",
-		},
-	}
-	rule := NewRule(cond, event, WithName("contains-rule"))
+	engine.AddFact("colors", []interface{}{"red", "green", "blue"})
+	rule := NewRule(
+		Condition{Fact: "colors", Operator: "contains", Value: "blue"},
+		Event{Type: "found-blue"},
+		WithName("contains-rule"),
+	)
 	engine.AddRule(rule)
 
-	// Run the engine (no runtime facts required).
 	result, err := engine.Run(nil)
-	if err != nil {
-		t.Fatalf("Engine run failed: %v", err)
-	}
-	if len(result.Events) != 1 {
-		t.Fatalf("Expected 1 event, got %d", len(result.Events))
-	}
-	if result.Events[0].Type != "contains-event" {
-		t.Fatalf("Expected event type 'contains-event', got %s", result.Events[0].Type)
-	}
+	require.NoError(t, err)
+	require.Len(t, result.Events, 1)
+	assert.Equal(t, "found-blue", result.Events[0].Type)
 }
 
-func TestCaseInsensitiveOperator(t *testing.T) {
+func TestEngine_OperatorDecorator(t *testing.T) {
 	engine := NewEngine()
-
-	// Register the "caseInsensitive" decorator.
-	// This decorator converts both values to lowercase (if they are strings)
-	// and then calls the underlying operator.
 	engine.AddOperatorDecorator("caseInsensitive", func(factValue interface{}, conditionValue interface{}, next OperatorFunc) bool {
 		s1, ok1 := factValue.(string)
 		s2, ok2 := conditionValue.(string)
 		if ok1 && ok2 {
 			return next(strings.ToLower(s1), strings.ToLower(s2))
 		}
-		// If values are not strings, fall back to the default behavior.
 		return next(factValue, conditionValue)
 	})
 
-	// Add a fact "username" that returns "Alice".
-	err := engine.AddFact("username", FactFunc(func(params map[string]interface{}, almanac *Almanac) (interface{}, error) {
-		return "Alice", nil
-	}))
-	if err != nil {
-		t.Fatalf("Failed to add fact: %v", err)
-	}
-
-	// Create a rule that uses the "caseInsensitive:equal" operator.
-	// It should compare the fact "username" to "alice" in a case-insensitive manner.
-	cond := Condition{
-		Fact:     "username",
-		Operator: "caseInsensitive:equal",
-		Value:    "alice",
-	}
-	event := Event{
-		Type: "welcome-event",
-		Params: map[string]interface{}{
-			"message": "Welcome, Alice!",
-		},
-	}
-	rule := NewRule(cond, event, WithName("welcome-rule"))
+	engine.AddFact("username", "Alice")
+	rule := NewRule(
+		Condition{Fact: "username", Operator: "caseInsensitive:equal", Value: "alice"},
+		Event{Type: "welcome"},
+		WithName("ci-rule"),
+	)
 	engine.AddRule(rule)
 
-	// Run the engine.
 	result, err := engine.Run(nil)
-	if err != nil {
-		t.Fatalf("Engine run failed: %v", err)
-	}
+	require.NoError(t, err)
+	require.Len(t, result.Events, 1)
+	assert.Equal(t, "welcome", result.Events[0].Type)
+}
 
-	// Expect the welcome event to be triggered.
-	if len(result.Events) != 1 {
-		t.Fatalf("Expected 1 event from caseInsensitive operator test, got %d", len(result.Events))
+func TestEngine_ConditionRef(t *testing.T) {
+	engine := NewEngine()
+	engine.AddFact("age", 25)
+
+	engine.SetCondition("is-adult", Condition{
+		Fact: "age", Operator: "greaterThanInclusive", Value: 18,
+	})
+
+	rule := NewRule(
+		Condition{ConditionRef: "is-adult"},
+		Event{Type: "adult-event"},
+		WithName("ref-rule"),
+	)
+	engine.AddRule(rule)
+
+	result, err := engine.Run(nil)
+	require.NoError(t, err)
+	require.Len(t, result.Events, 1)
+	assert.Equal(t, "adult-event", result.Events[0].Type)
+}
+
+func TestEvaluateCondition(t *testing.T) {
+	t.Run("simple true", func(t *testing.T) {
+		result, err := EvaluateCondition(
+			Condition{Fact: "age", Operator: "gt", Value: 18},
+			map[string]interface{}{"age": 25},
+		)
+		require.NoError(t, err)
+		assert.True(t, result)
+	})
+
+	t.Run("simple false", func(t *testing.T) {
+		result, err := EvaluateCondition(
+			Condition{Fact: "age", Operator: "gt", Value: 18},
+			map[string]interface{}{"age": 10},
+		)
+		require.NoError(t, err)
+		assert.False(t, result)
+	})
+
+	t.Run("nested condition", func(t *testing.T) {
+		result, err := EvaluateCondition(
+			Condition{All: []Condition{
+				{Fact: "age", Operator: "gt", Value: 18},
+				{Fact: "score", Operator: "lt", Value: 50},
+			}},
+			map[string]interface{}{"age": 25, "score": 30},
+		)
+		require.NoError(t, err)
+		assert.True(t, result)
+	})
+
+	t.Run("operator alias", func(t *testing.T) {
+		result, err := EvaluateCondition(
+			Condition{Fact: "x", Operator: "lte", Value: 100},
+			map[string]interface{}{"x": 100},
+		)
+		require.NoError(t, err)
+		assert.True(t, result)
+	})
+}
+
+func TestEvaluateCondition_Concurrent(t *testing.T) {
+	var wg sync.WaitGroup
+	errors := make([]error, 10)
+	results := make([]bool, 10)
+
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			val := idx + 1
+			result, err := EvaluateCondition(
+				Condition{Fact: "x", Operator: "greaterThan", Value: 0},
+				map[string]interface{}{"x": val},
+			)
+			errors[idx] = err
+			results[idx] = result
+		}(i)
 	}
-	if result.Events[0].Type != "welcome-event" {
-		t.Fatalf("Expected event type 'welcome-event', got %s", result.Events[0].Type)
+	wg.Wait()
+
+	for i := 0; i < 10; i++ {
+		assert.NoError(t, errors[i], "goroutine %d", i)
+		assert.True(t, results[i], "goroutine %d", i)
 	}
 }

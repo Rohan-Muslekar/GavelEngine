@@ -265,7 +265,7 @@ func TestNotCondition(t *testing.T) {
 	})
 }
 
-func TestConditionNestedConditions(t *testing.T) {
+func TestNestedConditions(t *testing.T) {
 	facts := map[string]interface{}{"a": 10, "b": 20, "c": 30}
 
 	t.Run("All[Any[leaf,leaf], leaf]", func(t *testing.T) {
