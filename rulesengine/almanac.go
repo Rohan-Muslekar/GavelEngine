@@ -65,7 +65,9 @@ func (a *Almanac) FactValue(factId string, params map[string]interface{}, path s
 	if err != nil {
 		return nil, err
 	}
-	a.factCache[factId][cacheKey] = value
+	if fact.Cache {
+		a.factCache[factId][cacheKey] = value
+	}
 	if path != "" {
 		return a.engine.pathResolver(value, path), nil
 	}
