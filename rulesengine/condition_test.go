@@ -297,6 +297,158 @@ func TestNestedConditions(t *testing.T) {
 	})
 }
 
+func TestOperator_In(t *testing.T) {
+	tests := []struct {
+		name  string
+		fact  interface{}
+		value interface{}
+		want  bool
+	}{
+		{"int in slice", 2, []interface{}{1, 2, 3}, true},
+		{"int not in slice", 4, []interface{}{1, 2, 3}, false},
+		{"string in slice", "b", []interface{}{"a", "b", "c"}, true},
+		{"empty slice", 1, []interface{}{}, false},
+		{"non-slice condition", 1, "not-a-slice", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := EvaluateCondition(
+				Condition{Fact: "x", Operator: "in", Value: tt.value},
+				map[string]interface{}{"x": tt.fact},
+			)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, result)
+		})
+	}
+}
+
+func TestOperator_NotIn(t *testing.T) {
+	tests := []struct {
+		name  string
+		fact  interface{}
+		value interface{}
+		want  bool
+	}{
+		{"int not in slice", 4, []interface{}{1, 2, 3}, true},
+		{"int in slice", 2, []interface{}{1, 2, 3}, false},
+		{"non-slice condition", 1, "not-a-slice", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := EvaluateCondition(
+				Condition{Fact: "x", Operator: "notIn", Value: tt.value},
+				map[string]interface{}{"x": tt.fact},
+			)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, result)
+		})
+	}
+}
+
+func TestOperator_Contains_String(t *testing.T) {
+	tests := []struct {
+		name  string
+		fact  interface{}
+		value interface{}
+		want  bool
+	}{
+		{"substring found", "hello world", "world", true},
+		{"substring not found", "hello world", "xyz", false},
+		{"empty substring", "hello", "", true},
+		{"empty string fact", "", "hello", false},
+		{"non-string condition value", "hello", 123, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := EvaluateCondition(
+				Condition{Fact: "x", Operator: "contains", Value: tt.value},
+				map[string]interface{}{"x": tt.fact},
+			)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, result)
+		})
+	}
+}
+
+func TestOperator_Contains_Slice(t *testing.T) {
+	tests := []struct {
+		name  string
+		fact  interface{}
+		value interface{}
+		want  bool
+	}{
+		{"element in slice", []interface{}{"a", "b", "c"}, "b", true},
+		{"element not in slice", []interface{}{"a", "b", "c"}, "d", false},
+		{"int element in slice", []interface{}{1, 2, 3}, 2, true},
+		{"type mismatch element", []interface{}{1, 2, 3}, "2", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := EvaluateCondition(
+				Condition{Fact: "x", Operator: "contains", Value: tt.value},
+				map[string]interface{}{"x": tt.fact},
+			)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, result)
+		})
+	}
+}
+
+func TestOperator_DoesNotContain(t *testing.T) {
+	tests := []struct {
+		name  string
+		fact  interface{}
+		value interface{}
+		want  bool
+	}{
+		{"string without substring", "hello", "xyz", true},
+		{"string with substring", "hello world", "world", false},
+		{"slice without element", []interface{}{1, 2}, 3, true},
+		{"slice with element", []interface{}{1, 2, 3}, 2, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := EvaluateCondition(
+				Condition{Fact: "x", Operator: "doesNotContain", Value: tt.value},
+				map[string]interface{}{"x": tt.fact},
+			)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, result)
+		})
+	}
+}
+
+func TestOperator_Matches(t *testing.T) {
+	tests := []struct {
+		name  string
+		fact  interface{}
+		value interface{}
+		want  bool
+	}{
+		{"valid match", "user@example.com", `^[a-z]+@[a-z]+\.[a-z]+$`, true},
+		{"no match", "invalid", `^[0-9]+$`, false},
+		{"invalid regex", "test", `[invalid`, false},
+		{"non-string fact", 123, `^[0-9]+$`, false},
+		{"non-string pattern", "test", 123, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := EvaluateCondition(
+				Condition{Fact: "x", Operator: "matches", Value: tt.value},
+				map[string]interface{}{"x": tt.fact},
+			)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, result)
+		})
+	}
+}
+
 func TestDeepNesting(t *testing.T) {
 	facts := map[string]interface{}{"x": 5}
 

@@ -2,6 +2,7 @@ package rulesengine
 
 import (
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -199,6 +200,36 @@ func (e *Engine) initOperators() {
 	e.operators["greaterThanInclusive"] = func(factValue, conditionValue interface{}) bool {
 		return compare(factValue, conditionValue) >= 0
 	}
+	e.operators["in"] = func(factValue, conditionValue interface{}) bool {
+		return sliceContains(conditionValue, factValue)
+	}
+	e.operators["notIn"] = func(factValue, conditionValue interface{}) bool {
+		return !sliceContains(conditionValue, factValue)
+	}
+	e.operators["contains"] = func(factValue, conditionValue interface{}) bool {
+		if s, ok := factValue.(string); ok {
+			if sub, ok := conditionValue.(string); ok {
+				return strings.Contains(s, sub)
+			}
+			return false
+		}
+		return sliceContains(factValue, conditionValue)
+	}
+	e.operators["doesNotContain"] = func(factValue, conditionValue interface{}) bool {
+		return !e.operators["contains"](factValue, conditionValue)
+	}
+	e.operators["matches"] = func(factValue, conditionValue interface{}) bool {
+		s, ok1 := factValue.(string)
+		pattern, ok2 := conditionValue.(string)
+		if !ok1 || !ok2 {
+			return false
+		}
+		matched, err := regexp.MatchString(pattern, s)
+		if err != nil {
+			return false
+		}
+		return matched
+	}
 	e.operators["lt"] = e.operators["lessThan"]
 	e.operators["gt"] = e.operators["greaterThan"]
 	e.operators["eq"] = e.operators["equal"]
@@ -253,6 +284,20 @@ func toFloat64(value interface{}) (float64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+func sliceContains(slice, element interface{}) bool {
+	rv := reflect.ValueOf(slice)
+	kind := rv.Kind()
+	if kind != reflect.Slice && kind != reflect.Array {
+		return false
+	}
+	for i := 0; i < rv.Len(); i++ {
+		if reflect.DeepEqual(rv.Index(i).Interface(), element) {
+			return true
+		}
+	}
+	return false
 }
 
 type PathResolverFunc func(object interface{}, path string) interface{}
