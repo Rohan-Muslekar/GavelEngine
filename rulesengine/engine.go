@@ -1,14 +1,16 @@
-// engine.go
 package rulesengine
 
 import (
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 )
 
-// Engine stores the facts, rules, operator functions and other options.
 type Engine struct {
+	mu                        sync.RWMutex
 	facts                     map[string]*Fact
 	rules                     []*Rule
 	operators                 map[string]OperatorFunc
@@ -17,11 +19,10 @@ type Engine struct {
 	allowUndefinedFacts       bool
 	allowUndefinedConditions  bool
 	replaceFactsInEventParams bool
-	stopRequested             bool
+	stopRequested             atomic.Bool
 	pathResolver              PathResolverFunc
 }
 
-// NewEngine creates a new engine instance with sensible defaults.
 func NewEngine() *Engine {
 	e := &Engine{
 		facts:                     make(map[string]*Fact),
@@ -32,15 +33,15 @@ func NewEngine() *Engine {
 		allowUndefinedFacts:       false,
 		allowUndefinedConditions:  false,
 		replaceFactsInEventParams: false,
-		stopRequested:             false,
 		pathResolver:              DefaultPathResolver,
 	}
 	e.initOperators()
 	return e
 }
 
-// AddFact adds a fact (constant or function) to the engine.
 func (e *Engine) AddFact(id string, definition interface{}, options ...FactOption) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	var factFunc FactFunc
 	var constant bool
 	switch def := definition.(type) {
@@ -48,7 +49,6 @@ func (e *Engine) AddFact(id string, definition interface{}, options ...FactOptio
 		factFunc = def
 		constant = false
 	default:
-		// Wrap constant value in a function.
 		factFunc = func(params map[string]interface{}, almanac *Almanac) (interface{}, error) {
 			return def, nil
 		}
@@ -57,7 +57,7 @@ func (e *Engine) AddFact(id string, definition interface{}, options ...FactOptio
 	fact := &Fact{
 		Id:         id,
 		Fn:         factFunc,
-		Cache:      true, // default: cache result
+		Cache:      true,
 		Priority:   1,
 		IsConstant: constant,
 	}
@@ -68,21 +68,24 @@ func (e *Engine) AddFact(id string, definition interface{}, options ...FactOptio
 	return nil
 }
 
-// RemoveFact removes a fact by its id.
 func (e *Engine) RemoveFact(id string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	delete(e.facts, id)
 }
 
-// AddRule adds a rule to the engine and sorts rules by priority (higher first).
 func (e *Engine) AddRule(rule *Rule) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	e.rules = append(e.rules, rule)
 	sort.Slice(e.rules, func(i, j int) bool {
 		return e.rules[i].Priority > e.rules[j].Priority
 	})
 }
 
-// RemoveRule removes rules by matching the rule’s Name.
 func (e *Engine) RemoveRule(ruleName string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	filtered := []*Rule{}
 	for _, r := range e.rules {
 		if r.Name != ruleName {
@@ -92,44 +95,49 @@ func (e *Engine) RemoveRule(ruleName string) {
 	e.rules = filtered
 }
 
-// AddOperator registers a new operator.
 func (e *Engine) AddOperator(name string, op OperatorFunc) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	e.operators[name] = op
 }
 
-// RemoveOperator removes a registered operator.
 func (e *Engine) RemoveOperator(name string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	delete(e.operators, name)
 }
 
-// AddOperatorDecorator registers a new operator decorator.
 func (e *Engine) AddOperatorDecorator(name string, decorator OperatorDecorator) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	e.operatorDecorators[name] = decorator
 }
 
-// RemoveOperatorDecorator removes an operator decorator.
 func (e *Engine) RemoveOperatorDecorator(name string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	delete(e.operatorDecorators, name)
 }
 
-// SetCondition sets a named condition that can be referenced by rules.
 func (e *Engine) SetCondition(name string, cond Condition) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	e.conditions[name] = cond
 }
 
-// RemoveCondition removes a named condition.
 func (e *Engine) RemoveCondition(name string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	delete(e.conditions, name)
 }
 
-// Stop requests that the engine stop evaluating further rules.
 func (e *Engine) Stop() {
-	e.stopRequested = true
+	e.stopRequested.Store(true)
 }
 
-// Run executes all the rules in the engine using the provided runtime facts.
-// It returns a RunResult with events and rule results.
 func (e *Engine) Run(runtimeFacts map[string]interface{}) (*RunResult, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	almanac := NewAlmanac(e, runtimeFacts)
 	result := &RunResult{
 		Almanac:            almanac,
@@ -140,7 +148,7 @@ func (e *Engine) Run(runtimeFacts map[string]interface{}) (*RunResult, error) {
 	}
 
 	for _, rule := range e.rules {
-		if e.stopRequested {
+		if e.stopRequested.Load() {
 			break
 		}
 		passed, ruleResult, err := rule.Evaluate(almanac, e)
@@ -168,8 +176,6 @@ func (e *Engine) Run(runtimeFacts map[string]interface{}) (*RunResult, error) {
 	return result, nil
 }
 
-// initOperators registers the built-in operators.
-
 func (e *Engine) initOperators() {
 	e.operators["equal"] = func(factValue, conditionValue interface{}) bool {
 		if s1, ok := factValue.(string); ok {
@@ -194,7 +200,36 @@ func (e *Engine) initOperators() {
 	e.operators["greaterThanInclusive"] = func(factValue, conditionValue interface{}) bool {
 		return compare(factValue, conditionValue) >= 0
 	}
-	// Short aliases for common operators.
+	e.operators["in"] = func(factValue, conditionValue interface{}) bool {
+		return sliceContains(conditionValue, factValue)
+	}
+	e.operators["notIn"] = func(factValue, conditionValue interface{}) bool {
+		return !sliceContains(conditionValue, factValue)
+	}
+	e.operators["contains"] = func(factValue, conditionValue interface{}) bool {
+		if s, ok := factValue.(string); ok {
+			if sub, ok := conditionValue.(string); ok {
+				return strings.Contains(s, sub)
+			}
+			return false
+		}
+		return sliceContains(factValue, conditionValue)
+	}
+	e.operators["doesNotContain"] = func(factValue, conditionValue interface{}) bool {
+		return !e.operators["contains"](factValue, conditionValue)
+	}
+	e.operators["matches"] = func(factValue, conditionValue interface{}) bool {
+		s, ok1 := factValue.(string)
+		pattern, ok2 := conditionValue.(string)
+		if !ok1 || !ok2 {
+			return false
+		}
+		matched, err := regexp.MatchString(pattern, s)
+		if err != nil {
+			return false
+		}
+		return matched
+	}
 	e.operators["lt"] = e.operators["lessThan"]
 	e.operators["gt"] = e.operators["greaterThan"]
 	e.operators["eq"] = e.operators["equal"]
@@ -203,17 +238,12 @@ func (e *Engine) initOperators() {
 	e.operators["gte"] = e.operators["greaterThanInclusive"]
 }
 
-// EvaluateCondition evaluates a condition tree against the provided facts
-// using a default Engine with standard operators. This is a convenience
-// wrapper for consumers who only need condition evaluation without the
-// full Rule/Event pipeline.
 func EvaluateCondition(condition Condition, facts map[string]interface{}) (bool, error) {
 	engine := NewEngine()
 	almanac := NewAlmanac(engine, facts)
 	return condition.Evaluate(almanac, engine)
 }
 
-// compare compares two values as numbers (or as strings if not numbers).
 func compare(a, b interface{}) int {
 	fa, ok1 := toFloat64(a)
 	fb, ok2 := toFloat64(b)
@@ -256,11 +286,22 @@ func toFloat64(value interface{}) (float64, bool) {
 	}
 }
 
-// PathResolverFunc defines how to extract a value given a path.
+func sliceContains(slice, element interface{}) bool {
+	rv := reflect.ValueOf(slice)
+	kind := rv.Kind()
+	if kind != reflect.Slice && kind != reflect.Array {
+		return false
+	}
+	for i := 0; i < rv.Len(); i++ {
+		if reflect.DeepEqual(rv.Index(i).Interface(), element) {
+			return true
+		}
+	}
+	return false
+}
+
 type PathResolverFunc func(object interface{}, path string) interface{}
 
-// DefaultPathResolver is a simple implementation that supports top-level access.
-// For a field ".foo", it returns object["foo"] if object is a map.
 func DefaultPathResolver(object interface{}, path string) interface{} {
 	if m, ok := object.(map[string]interface{}); ok {
 		key := strings.TrimPrefix(path, ".")
@@ -269,17 +310,17 @@ func DefaultPathResolver(object interface{}, path string) interface{} {
 	return nil
 }
 
-// RunResult holds the result of an engine run.
 type RunResult struct {
-	Events             []Event
-	FailureEvents      []Event
-	Almanac            *Almanac
-	RuleResults        []*RuleResult
-	FailureRuleResults []*RuleResult
+	Events             []Event       `json:"events" bson:"events" xml:"events" yaml:"events"`
+	FailureEvents      []Event       `json:"failureEvents" bson:"failureEvents" xml:"failureEvents" yaml:"failureEvents"`
+	Almanac            *Almanac      `json:"-" bson:"-" xml:"-" yaml:"-"`
+	RuleResults        []*RuleResult `json:"ruleResults" bson:"ruleResults" xml:"ruleResults" yaml:"ruleResults"`
+	FailureRuleResults []*RuleResult `json:"failureRuleResults" bson:"failureRuleResults" xml:"failureRuleResults" yaml:"failureRuleResults"`
 }
 
-// Get all rules
 func (e *Engine) GetRulesAsJSON() []interface{} {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	var rules []interface{}
 	for _, rule := range e.rules {
 		rules = append(rules, rule.ToJSON())

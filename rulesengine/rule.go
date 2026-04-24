@@ -8,19 +8,18 @@ import (
 
 // Rule represents a single rule with its conditions, event, priority, and callbacks.
 type Rule struct {
-	Conditions Condition
-	Event      Event
-	Priority   int
-	Name       string
-	OnSuccess  func(event Event, almanac *Almanac, ruleResult *RuleResult) error
-	OnFailure  func(event Event, almanac *Almanac, ruleResult *RuleResult) error
+	Conditions Condition                                                         `json:"conditions" bson:"conditions" xml:"conditions" yaml:"conditions"`
+	Event      Event                                                             `json:"event" bson:"event" xml:"event" yaml:"event"`
+	Priority   int                                                               `json:"priority" bson:"priority" xml:"priority" yaml:"priority"`
+	Name       string                                                            `json:"name" bson:"name" xml:"name" yaml:"name"`
+	OnSuccess  func(event Event, almanac *Almanac, ruleResult *RuleResult) error  `json:"-" bson:"-" xml:"-" yaml:"-"`
+	OnFailure  func(event Event, almanac *Almanac, ruleResult *RuleResult) error  `json:"-" bson:"-" xml:"-" yaml:"-"`
 }
 
 // RuleResult holds metadata about a rule evaluation.
 type RuleResult struct {
-	Name    string
-	Success bool
-	// Additional details (like intermediate condition results) could be stored here.
+	Name    string `json:"name" bson:"name" xml:"name" yaml:"name"`
+	Success bool   `json:"success" bson:"success" xml:"success" yaml:"success"`
 }
 
 // NewRule creates a new rule instance.
@@ -82,21 +81,21 @@ func (r *Rule) Evaluate(almanac *Almanac, engine *Engine) (bool, *RuleResult, er
 
 // Event represents an event triggered by a rule.
 type Event struct {
-	Type   string
-	Params map[string]interface{}
+	Type   string                 `json:"type" bson:"type" xml:"type" yaml:"type"`
+	Params map[string]interface{} `json:"params,omitempty" bson:"params,omitempty" xml:"params,omitempty" yaml:"params,omitempty"`
 }
 
 // Condition represents a rule condition. It supports basic comparisons as well as nested boolean expressions.
 type Condition struct {
-	All          []Condition            `json:"all,omitempty" bson:"all,omitempty"`
-	Any          []Condition            `json:"any,omitempty" bson:"any,omitempty"`
-	Not          *Condition             `json:"not,omitempty" bson:"not,omitempty"`
-	Fact         string                 `json:"fact,omitempty" bson:"fact,omitempty"`
-	Operator     string                 `json:"operator,omitempty" bson:"operator,omitempty"`
-	Value        interface{}            `json:"value,omitempty" bson:"value,omitempty"`
-	Params       map[string]interface{} `json:"params,omitempty" bson:"params,omitempty"`
-	Path         string                 `json:"path,omitempty" bson:"path,omitempty"`
-	ConditionRef string                 `json:"condition,omitempty" bson:"condition,omitempty"`
+	All          []Condition            `json:"all,omitempty" bson:"all,omitempty" xml:"all,omitempty" yaml:"all,omitempty"`
+	Any          []Condition            `json:"any,omitempty" bson:"any,omitempty" xml:"any,omitempty" yaml:"any,omitempty"`
+	Not          *Condition             `json:"not,omitempty" bson:"not,omitempty" xml:"not,omitempty" yaml:"not,omitempty"`
+	Fact         string                 `json:"fact,omitempty" bson:"fact,omitempty" xml:"fact,omitempty" yaml:"fact,omitempty"`
+	Operator     string                 `json:"operator,omitempty" bson:"operator,omitempty" xml:"operator,omitempty" yaml:"operator,omitempty"`
+	Value        interface{}            `json:"value,omitempty" bson:"value,omitempty" xml:"value,omitempty" yaml:"value,omitempty"`
+	Params       map[string]interface{} `json:"params,omitempty" bson:"params,omitempty" xml:"params,omitempty" yaml:"params,omitempty"`
+	Path         string                 `json:"path,omitempty" bson:"path,omitempty" xml:"path,omitempty" yaml:"path,omitempty"`
+	ConditionRef string                 `json:"condition,omitempty" bson:"condition,omitempty" xml:"condition,omitempty" yaml:"condition,omitempty"`
 }
 
 // Evaluate evaluates the condition recursively.

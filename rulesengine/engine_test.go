@@ -320,3 +320,107 @@ func TestEvaluateCondition_Concurrent(t *testing.T) {
 		assert.True(t, results[i], "goroutine %d", i)
 	}
 }
+
+func TestEngine_ConcurrentRun(t *testing.T) {
+	engine := NewEngine()
+	engine.AddFact("x", 42)
+	rule := NewRule(
+		Condition{Fact: "x", Operator: "equal", Value: 42},
+		Event{Type: "match"},
+		WithName("concurrent-rule"),
+	)
+	engine.AddRule(rule)
+
+	var wg sync.WaitGroup
+	n := 50
+	results := make([]*RunResult, n)
+	errors := make([]error, n)
+
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			result, err := engine.Run(nil)
+			results[idx] = result
+			errors[idx] = err
+		}(i)
+	}
+	wg.Wait()
+
+	for i := 0; i < n; i++ {
+		require.NoError(t, errors[i], "goroutine %d", i)
+		require.Len(t, results[i].Events, 1, "goroutine %d", i)
+		assert.Equal(t, "match", results[i].Events[0].Type, "goroutine %d", i)
+	}
+}
+
+func TestEngine_MutationDuringSetup(t *testing.T) {
+	engine := NewEngine()
+	var wg sync.WaitGroup
+	n := 100
+
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			factId := fmt.Sprintf("fact-%d", idx)
+			engine.AddFact(factId, idx)
+
+			rule := NewRule(
+				Condition{Fact: factId, Operator: "equal", Value: idx},
+				Event{Type: fmt.Sprintf("event-%d", idx)},
+				WithName(fmt.Sprintf("rule-%d", idx)),
+			)
+			engine.AddRule(rule)
+		}(i)
+	}
+	wg.Wait()
+
+	assert.Len(t, engine.facts, n)
+	assert.Len(t, engine.rules, n)
+}
+
+func TestEngine_StopAtomic(t *testing.T) {
+	engine := NewEngine()
+
+	started := make(chan struct{})
+	proceed := make(chan struct{})
+	engine.AddFact("slow", FactFunc(func(params map[string]interface{}, almanac *Almanac) (interface{}, error) {
+		close(started)
+		<-proceed
+		return true, nil
+	}))
+
+	rule1 := NewRule(
+		Condition{Fact: "slow", Operator: "equal", Value: true},
+		Event{Type: "first"},
+		WithName("rule1"),
+		WithPriorityForRule(10),
+	)
+	rule2 := NewRule(
+		Condition{Fact: "slow", Operator: "equal", Value: true},
+		Event{Type: "second"},
+		WithName("rule2"),
+		WithPriorityForRule(1),
+	)
+	engine.AddRule(rule1)
+	engine.AddRule(rule2)
+
+	var result *RunResult
+	var runErr error
+	done := make(chan struct{})
+
+	go func() {
+		result, runErr = engine.Run(nil)
+		close(done)
+	}()
+
+	<-started
+	engine.Stop()
+	close(proceed)
+
+	<-done
+	require.NoError(t, runErr)
+	assert.Len(t, result.Events, 1)
+	assert.Equal(t, "first", result.Events[0].Type)
+}
