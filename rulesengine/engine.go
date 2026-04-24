@@ -311,11 +311,11 @@ func DefaultPathResolver(object interface{}, path string) interface{} {
 }
 
 type RunResult struct {
-	Events             []Event
-	FailureEvents      []Event
-	Almanac            *Almanac
-	RuleResults        []*RuleResult
-	FailureRuleResults []*RuleResult
+	Events             []Event       `json:"events" bson:"events" xml:"events" yaml:"events"`
+	FailureEvents      []Event       `json:"failureEvents" bson:"failureEvents" xml:"failureEvents" yaml:"failureEvents"`
+	Almanac            *Almanac      `json:"-" bson:"-" xml:"-" yaml:"-"`
+	RuleResults        []*RuleResult `json:"ruleResults" bson:"ruleResults" xml:"ruleResults" yaml:"ruleResults"`
+	FailureRuleResults []*RuleResult `json:"failureRuleResults" bson:"failureRuleResults" xml:"failureRuleResults" yaml:"failureRuleResults"`
 }
 
 func (e *Engine) GetRulesAsJSON() []interface{} {
