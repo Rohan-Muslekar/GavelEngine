@@ -18,8 +18,9 @@ type Rule struct {
 
 // RuleResult holds metadata about a rule evaluation.
 type RuleResult struct {
-	Name    string `json:"name" bson:"name" xml:"name" yaml:"name"`
-	Success bool   `json:"success" bson:"success" xml:"success" yaml:"success"`
+	Name    string     `json:"name" bson:"name" xml:"name" yaml:"name"`
+	Success bool       `json:"success" bson:"success" xml:"success" yaml:"success"`
+	Trace   *TraceNode `json:"trace,omitempty" bson:"trace,omitempty" xml:"trace,omitempty" yaml:"trace,omitempty"`
 }
 
 // NewRule creates a new rule instance.

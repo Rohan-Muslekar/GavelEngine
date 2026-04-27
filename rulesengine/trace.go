@@ -93,3 +93,26 @@ func (c *Condition) EvaluateWithTrace(almanac *Almanac, engine *Engine) (bool, *
 
 	return false, nil, fmt.Errorf("invalid condition")
 }
+
+type RunOption func(*runConfig)
+
+type runConfig struct {
+	trace bool
+}
+
+func WithTrace() RunOption {
+	return func(c *runConfig) { c.trace = true }
+}
+
+func (r *Rule) EvaluateWithTrace(almanac *Almanac, engine *Engine) (bool, *RuleResult, error) {
+	result, trace, err := r.Conditions.EvaluateWithTrace(almanac, engine)
+	if err != nil {
+		return false, nil, err
+	}
+	ruleResult := &RuleResult{
+		Name:    r.Name,
+		Success: result,
+		Trace:   trace,
+	}
+	return result, ruleResult, nil
+}

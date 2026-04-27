@@ -145,9 +145,15 @@ func (e *Engine) Stop() {
 	e.stopRequested.Store(true)
 }
 
-func (e *Engine) Run(runtimeFacts map[string]interface{}) (*RunResult, error) {
+func (e *Engine) Run(runtimeFacts map[string]interface{}, options ...RunOption) (*RunResult, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
+
+	cfg := &runConfig{}
+	for _, opt := range options {
+		opt(cfg)
+	}
+
 	almanac := NewAlmanac(e, runtimeFacts)
 	result := &RunResult{
 		Almanac:            almanac,
@@ -161,7 +167,14 @@ func (e *Engine) Run(runtimeFacts map[string]interface{}) (*RunResult, error) {
 		if e.stopRequested.Load() {
 			break
 		}
-		passed, ruleResult, err := rule.Evaluate(almanac, e)
+		var passed bool
+		var ruleResult *RuleResult
+		var err error
+		if cfg.trace {
+			passed, ruleResult, err = rule.EvaluateWithTrace(almanac, e)
+		} else {
+			passed, ruleResult, err = rule.Evaluate(almanac, e)
+		}
 		if err != nil {
 			return nil, err
 		}

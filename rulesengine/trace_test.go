@@ -101,3 +101,36 @@ func TestEvaluateWithTrace_ConditionRef(t *testing.T) {
 	require.Len(t, trace.Children, 1)
 	assert.Equal(t, 25, trace.Children[0].FactValue)
 }
+
+func TestRun_WithTrace(t *testing.T) {
+	engine := NewEngine()
+	engine.AddFact("age", 25)
+	engine.AddRule(NewRule(
+		Condition{Fact: "age", Operator: "gte", Value: 18},
+		Event{Type: "adult"},
+		WithName("age-check"),
+	))
+
+	result, err := engine.Run(nil, WithTrace())
+	require.NoError(t, err)
+	require.Len(t, result.RuleResults, 1)
+	require.NotNil(t, result.RuleResults[0].Trace)
+	assert.True(t, result.RuleResults[0].Trace.Result)
+	assert.Equal(t, 25, result.RuleResults[0].Trace.FactValue)
+	assert.Equal(t, "age", result.RuleResults[0].Trace.Condition.Fact)
+}
+
+func TestRun_WithoutTrace(t *testing.T) {
+	engine := NewEngine()
+	engine.AddFact("age", 25)
+	engine.AddRule(NewRule(
+		Condition{Fact: "age", Operator: "gte", Value: 18},
+		Event{Type: "adult"},
+		WithName("age-check"),
+	))
+
+	result, err := engine.Run(nil)
+	require.NoError(t, err)
+	require.Len(t, result.RuleResults, 1)
+	assert.Nil(t, result.RuleResults[0].Trace)
+}
