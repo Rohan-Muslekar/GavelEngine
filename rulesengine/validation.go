@@ -2,6 +2,84 @@ package rulesengine
 
 import "fmt"
 
+func (e *Engine) Validate() []ValidationError {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	var errs []ValidationError
+	for i, rule := range e.rules {
+		prefix := fmt.Sprintf("rules[%d]", i)
+
+		structErrs := ValidateCondition(&rule.Conditions)
+		for _, se := range structErrs {
+			path := prefix
+			if se.Path != "" {
+				path = prefix + "." + se.Path
+			}
+			errs = append(errs, ValidationError{Path: path, Message: se.Message})
+		}
+
+		errs = append(errs, e.validateConditionState(&rule.Conditions, prefix)...)
+	}
+	return errs
+}
+
+func (e *Engine) validateConditionState(c *Condition, path string) []ValidationError {
+	var errs []ValidationError
+
+	if c.ConditionRef != "" {
+		if !e.allowUndefinedConditions {
+			if _, ok := e.conditions[c.ConditionRef]; !ok {
+				errs = append(errs, ValidationError{
+					Path:    path,
+					Message: fmt.Sprintf("undefined condition reference: %s", c.ConditionRef),
+				})
+			}
+		}
+		return errs
+	}
+
+	if c.Fact != "" && c.Operator != "" {
+		if !e.allowUndefinedFacts {
+			if _, ok := e.facts[c.Fact]; !ok {
+				errs = append(errs, ValidationError{
+					Path:    path,
+					Message: fmt.Sprintf("undefined fact: %s", c.Fact),
+				})
+			}
+		}
+		parts := splitOperator(c.Operator)
+		baseName := parts[len(parts)-1]
+		if _, ok := e.operators[baseName]; !ok {
+			errs = append(errs, ValidationError{
+				Path:    path,
+				Message: fmt.Sprintf("undefined operator: %s", baseName),
+			})
+		}
+		for i := 0; i < len(parts)-1; i++ {
+			if _, ok := e.operatorDecorators[parts[i]]; !ok {
+				errs = append(errs, ValidationError{
+					Path:    path,
+					Message: fmt.Sprintf("undefined operator decorator: %s", parts[i]),
+				})
+			}
+		}
+		return errs
+	}
+
+	for i, child := range c.All {
+		errs = append(errs, e.validateConditionState(&child, fmt.Sprintf("%s.All[%d]", path, i))...)
+	}
+	for i, child := range c.Any {
+		errs = append(errs, e.validateConditionState(&child, fmt.Sprintf("%s.Any[%d]", path, i))...)
+	}
+	if c.Not != nil {
+		errs = append(errs, e.validateConditionState(c.Not, path+".Not")...)
+	}
+
+	return errs
+}
+
 type ValidationError struct {
 	Path    string
 	Message string

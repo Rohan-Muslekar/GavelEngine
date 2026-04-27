@@ -124,3 +124,131 @@ func TestValidateCondition_Errors(t *testing.T) {
 		})
 	}
 }
+
+func TestEngineValidate_StateErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		setup   func(e *Engine)
+		rule    *Rule
+		wantMsg string
+	}{
+		{
+			name:  "undefined fact",
+			setup: func(e *Engine) {},
+			rule: NewRule(
+				Condition{Fact: "missing", Operator: "equal", Value: 1},
+				Event{Type: "test"},
+			),
+			wantMsg: "undefined fact: missing",
+		},
+		{
+			name: "undefined operator",
+			setup: func(e *Engine) {
+				e.AddFact("x", 1)
+			},
+			rule: NewRule(
+				Condition{Fact: "x", Operator: "customOp", Value: 1},
+				Event{Type: "test"},
+			),
+			wantMsg: "undefined operator: customOp",
+		},
+		{
+			name: "undefined decorator",
+			setup: func(e *Engine) {
+				e.AddFact("x", 1)
+			},
+			rule: NewRule(
+				Condition{Fact: "x", Operator: "myDec:equal", Value: 1},
+				Event{Type: "test"},
+			),
+			wantMsg: "undefined operator decorator: myDec",
+		},
+		{
+			name:  "undefined condition ref",
+			setup: func(e *Engine) {},
+			rule: NewRule(
+				Condition{ConditionRef: "nonexistent"},
+				Event{Type: "test"},
+			),
+			wantMsg: "undefined condition reference: nonexistent",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			engine := NewEngine()
+			tt.setup(engine)
+			err := engine.AddRule(tt.rule)
+			require.NoError(t, err)
+			errs := engine.Validate()
+			require.NotEmpty(t, errs)
+			found := false
+			for _, e := range errs {
+				if strings.Contains(e.Message, tt.wantMsg) {
+					found = true
+					break
+				}
+			}
+			assert.True(t, found, "expected error containing %q, got: %v", tt.wantMsg, errs)
+		})
+	}
+}
+
+func TestEngineValidate_AllowUndefinedFacts(t *testing.T) {
+	engine := NewEngine()
+	engine.allowUndefinedFacts = true
+	err := engine.AddRule(NewRule(
+		Condition{Fact: "missing", Operator: "equal", Value: 1},
+		Event{Type: "test"},
+	))
+	require.NoError(t, err)
+	errs := engine.Validate()
+	assert.Empty(t, errs)
+}
+
+func TestEngineValidate_AllowUndefinedConditions(t *testing.T) {
+	engine := NewEngine()
+	engine.allowUndefinedConditions = true
+	err := engine.AddRule(NewRule(
+		Condition{ConditionRef: "nonexistent"},
+		Event{Type: "test"},
+	))
+	require.NoError(t, err)
+	errs := engine.Validate()
+	assert.Empty(t, errs)
+}
+
+func TestEngineValidate_ValidEngine(t *testing.T) {
+	engine := NewEngine()
+	engine.AddFact("age", 18)
+	err := engine.AddRule(NewRule(
+		Condition{Fact: "age", Operator: "gte", Value: 18},
+		Event{Type: "adult"},
+	))
+	require.NoError(t, err)
+	errs := engine.Validate()
+	assert.Empty(t, errs)
+}
+
+func TestAddRule_InvalidCondition(t *testing.T) {
+	engine := NewEngine()
+	rule := NewRule(
+		Condition{},
+		Event{Type: "test"},
+	)
+	err := engine.AddRule(rule)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid rule conditions")
+	assert.Empty(t, engine.rules)
+}
+
+func TestAddRule_ValidCondition(t *testing.T) {
+	engine := NewEngine()
+	rule := NewRule(
+		Condition{Fact: "x", Operator: "eq", Value: 1},
+		Event{Type: "test"},
+	)
+	err := engine.AddRule(rule)
+	require.NoError(t, err)
+	assert.Len(t, engine.rules, 1)
+}

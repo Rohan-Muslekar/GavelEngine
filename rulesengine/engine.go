@@ -1,6 +1,7 @@
 package rulesengine
 
 import (
+	"fmt"
 	"reflect"
 	"regexp"
 	"sort"
@@ -74,13 +75,22 @@ func (e *Engine) RemoveFact(id string) {
 	delete(e.facts, id)
 }
 
-func (e *Engine) AddRule(rule *Rule) {
+func (e *Engine) AddRule(rule *Rule) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	errs := ValidateCondition(&rule.Conditions)
+	if len(errs) > 0 {
+		msgs := make([]string, len(errs))
+		for i, ve := range errs {
+			msgs[i] = ve.Error()
+		}
+		return fmt.Errorf("invalid rule conditions: %s", strings.Join(msgs, "; "))
+	}
 	e.rules = append(e.rules, rule)
 	sort.Slice(e.rules, func(i, j int) bool {
 		return e.rules[i].Priority > e.rules[j].Priority
 	})
+	return nil
 }
 
 func (e *Engine) RemoveRule(ruleName string) {
