@@ -1,6 +1,7 @@
 package rulesengine
 
 import (
+	"fmt"
 	"reflect"
 	"regexp"
 	"sort"
@@ -74,13 +75,22 @@ func (e *Engine) RemoveFact(id string) {
 	delete(e.facts, id)
 }
 
-func (e *Engine) AddRule(rule *Rule) {
+func (e *Engine) AddRule(rule *Rule) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	errs := ValidateCondition(&rule.Conditions)
+	if len(errs) > 0 {
+		msgs := make([]string, len(errs))
+		for i, ve := range errs {
+			msgs[i] = ve.Error()
+		}
+		return fmt.Errorf("invalid rule conditions: %s", strings.Join(msgs, "; "))
+	}
 	e.rules = append(e.rules, rule)
 	sort.Slice(e.rules, func(i, j int) bool {
 		return e.rules[i].Priority > e.rules[j].Priority
 	})
+	return nil
 }
 
 func (e *Engine) RemoveRule(ruleName string) {
@@ -135,9 +145,15 @@ func (e *Engine) Stop() {
 	e.stopRequested.Store(true)
 }
 
-func (e *Engine) Run(runtimeFacts map[string]interface{}) (*RunResult, error) {
+func (e *Engine) Run(runtimeFacts map[string]interface{}, options ...RunOption) (*RunResult, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
+
+	cfg := &runConfig{}
+	for _, opt := range options {
+		opt(cfg)
+	}
+
 	almanac := NewAlmanac(e, runtimeFacts)
 	result := &RunResult{
 		Almanac:            almanac,
@@ -151,7 +167,14 @@ func (e *Engine) Run(runtimeFacts map[string]interface{}) (*RunResult, error) {
 		if e.stopRequested.Load() {
 			break
 		}
-		passed, ruleResult, err := rule.Evaluate(almanac, e)
+		var passed bool
+		var ruleResult *RuleResult
+		var err error
+		if cfg.trace {
+			passed, ruleResult, err = rule.EvaluateWithTrace(almanac, e)
+		} else {
+			passed, ruleResult, err = rule.Evaluate(almanac, e)
+		}
 		if err != nil {
 			return nil, err
 		}
